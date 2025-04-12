@@ -1,3 +1,56 @@
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #e9ecef;
+  color: #333;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-header {
+  background-color: #2c3e50;
+  color: white;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.app-header p {
+  margin: 0.5rem 0 0 0;
+  opacity: 0.8;
+}
+
+.app-content {
+  flex: 1;
+  padding: 2rem;
+}
+
+.app-footer {
+  background-color: #2c3e50;
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: white;
+  border-top: 1px solid #e2e8f0;
+}
+
+.api-status {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  border-radius: 9999px;
+  background-color: white;
+  color: #333;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
 #root {
   max-width: 1280px;
   margin: 0 auto;

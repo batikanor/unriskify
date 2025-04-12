@@ -1,0 +1,131 @@
+.markdown-viewer {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  position: relative;
+  color: #1a1a1a;
+}
+
+.markdown-content {
+  background-color: #f8f9fa;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+  color: #333;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.markdown-content h1, 
+.markdown-content h2 {
+  color: #2c3e50;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.markdown-content h1 {
+  font-size: 2rem;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: 0.5rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.5rem;
+}
+
+.markdown-content p {
+  margin: 1rem 0;
+  color: #333;
+}
+
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid #ddd;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-content th {
+  background-color: #e9ecef;
+}
+
+.markdown-content tr:nth-child(even) {
+  background-color: #f2f2f2;
+}
+
+.markdown-content tr:nth-child(odd) {
+  background-color: #ffffff;
+}
+
+/* Selection styling - make it very visible */
+.markdown-content ::selection {
+  background-color: #ff8989 !important;
+  color: #333 !important;
+}
+
+.markdown-content ::-moz-selection {
+  background-color: #ff8989 !important;
+  color: #333 !important;
+}
+
+/* Character count popup */
+.character-popup {
+  background-color: #2c3e50;
+  color: white;
+  padding: 10px 18px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  font-size: 1rem;
+  font-weight: bold;
+  min-width: 180px;
+  text-align: center;
+  position: relative;
+}
+
+.character-popup p {
+  margin: 0;
+}
+
+.character-popup strong {
+  color: #4fd1c5;
+  font-size: 1.1rem;
+}
+
+/* Close button for popup */
+.close-popup {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: #e53e3e;
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.close-popup:hover {
+  background-color: #c53030;
+  transform: scale(1.1);
+}
+
+.close-popup:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.5);
+} 

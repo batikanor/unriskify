@@ -1,5 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+class TextSelection(BaseModel):
+    text: str
 
 app = FastAPI()
 
@@ -15,6 +19,11 @@ app.add_middleware(
 @app.get("/api/hello")
 def read_root():
     return {"message": "Hello from FastAPI"}
+
+@app.post("/api/count-characters")
+def count_characters(selection: TextSelection):
+    char_count = len(selection.text)
+    return {"count": char_count}
 
 if __name__ == "__main__":
     import uvicorn
