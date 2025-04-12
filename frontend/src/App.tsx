@@ -24,8 +24,12 @@ function App() {
   return (
     <div className="app-container">
       <header className="app-header">
-        <h1>Writeup Viewer</h1>
-        <p>Select text to view character count</p>
+        <div className="logo-container">
+          <img src="/logo-unriskify.png" alt="Unriskify Logo" className="app-logo" />
+        </div>
+        <div className="header-text">
+          <h2>Eats your risk away</h2>
+        </div>
       </header>
       
       <main className="app-content">

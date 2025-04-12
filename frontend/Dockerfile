@@ -2,14 +2,22 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci
+# Copy package files
+COPY package*.json ./
 
+# Install dependencies
+RUN npm install
+RUN npm install react-force-graph-3d three @types/three
+
+# Copy app files
 COPY . .
 
-# Set environment variables for Vite to listen on all interfaces
-ENV VITE_HOST=0.0.0.0
-ENV VITE_PORT=5173
+# Vite uses port 5173 by default
+EXPOSE 5173
 
-# Use Vite's development server instead of building and serving
+# Set environment variables
+ENV HOST=0.0.0.0
+ENV PORT=5173
+
+# Start the development server
 CMD ["npm", "run", "dev"]

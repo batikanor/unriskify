@@ -7,17 +7,23 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./structured_input:/app/structured_input
+      - ./logs:/app/logs
     environment:
       - ENVIRONMENT=development
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OLLAMA_API_URL=http://host.docker.internal:11434
     restart: always
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "5173:5173"
     volumes:
       - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
+      - /app/node_modules
     depends_on:
       - backend
     environment:

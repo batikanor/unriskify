@@ -1,54 +1,114 @@
 body {
   margin: 0;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #e9ecef;
-  color: #333;
+  background-color: #f1e8d8; /* Light cream background from logo */
+  color: #4f2913; /* Dark brown from logo */
+  background-image: linear-gradient(rgba(192, 113, 64, 0.05) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(192, 113, 64, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
 .app-container {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  max-width: 1400px;
+  margin: 0 auto;
+  box-shadow: 0 0 20px rgba(79, 41, 19, 0.15);
 }
 
 .app-header {
-  background-color: #2c3e50;
-  color: white;
+  background-color: #4f2913; /* Dark brown from logo */
+  color: #f1e8d8; /* Light cream from logo */
   padding: 1.5rem;
   text-align: center;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.logo-container {
+  /* display: flex; */
+  align-items: center;
+}
+
+.app-logo {
+  height: 130px;
+  border-radius: 50%;
+  background-color: #f1e8d8; /* Light cream background */
+  padding: 0rem;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
+  border: 1px solid #f1e8d8;
+}
+
+.header-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .app-header h1 {
   margin: 0;
   font-size: 2rem;
+  color: #7b8c43; /* Green from logo */
 }
 
 .app-header p {
   margin: 0.5rem 0 0 0;
-  opacity: 0.8;
+  color: #c07140; /* Orange/brown from logo */
+  font-weight: 500;
 }
 
 .app-content {
   flex: 1;
   padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  background-color: white;
+  box-shadow: 0 0 10px rgba(79, 41, 19, 0.1); /* Subtle shadow with logo brown */
+  border-radius: 8px;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.app-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #4f2913, #7b8c43, #c07140, #f1e8d8);
+  border-radius: 8px 8px 0 0;
 }
 
 .app-footer {
-  background-color: #2c3e50;
+  background-color: #4f2913; /* Dark brown from logo */
   padding: 1rem;
   text-align: center;
   font-size: 0.875rem;
-  color: white;
-  border-top: 1px solid #e2e8f0;
+  color: #f1e8d8; /* Light cream from logo */
+  border-top: 1px solid #c07140; /* Orange/brown from logo */
 }
 
 .api-status {
   display: inline-block;
   padding: 0.3rem 0.8rem;
   border-radius: 9999px;
-  background-color: white;
-  color: #333;
+  background-color: #f1e8d8; /* Light cream from logo */
+  color: #4f2913; /* Dark brown from logo */
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #7b8c43; /* Green from logo */
+  transition: all 0.2s ease;
+}
+
+.api-status:hover {
+  background-color: #7b8c43; /* Green from logo */
+  color: #f1e8d8; /* Light cream from logo */
 }
 
 #root {
@@ -92,4 +152,78 @@ body {
 
 .read-the-docs {
   color: #888;
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 1rem;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .header-text {
+    align-items: center;
+    text-align: center;
+  }
+
+  .app-logo {
+    height: 70px;
+  }
+
+  .app-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .app-content {
+    padding: 1rem;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+  }
+}
+
+/* Theme buttons and links */
+button, .button {
+  background-color: #7b8c43; /* Green from logo */
+  color: #f1e8d8; /* Light cream from logo */
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+button:hover, .button:hover {
+  background-color: #c07140; /* Orange/brown from logo */
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+}
+
+a {
+  color: #c07140; /* Orange/brown from logo */
+  text-decoration: none;
+  transition: color 0.2s ease;
+  font-weight: 500;
+}
+
+a:hover {
+  color: #4f2913; /* Dark brown from logo */
+  text-decoration: underline;
+}
+
+/* Input styling */
+input, textarea, select {
+  border: 1px solid #c07140; /* Orange/brown from logo */
+  border-radius: 4px;
+  padding: 0.5rem;
+  font-family: inherit;
+  background-color: #f1e8d8; /* Light cream from logo */
+  color: #4f2913; /* Dark brown from logo */
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: #7b8c43; /* Green from logo */
+  box-shadow: 0 0 0 2px rgba(123, 140, 67, 0.2);
 }

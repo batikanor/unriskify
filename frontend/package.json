@@ -14,7 +14,9 @@
     "framer-motion": "^12.6.5",
     "marked": "^15.0.8",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-force-graph-3d": "^1.26.1",
+    "three": "^0.175.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
