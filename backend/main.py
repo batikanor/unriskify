@@ -102,7 +102,7 @@ app.add_middleware(
 
 @app.get("/api/hello")
 def read_root():
-    return {"message": "Hello from FastAPI"}
+    return {"message": "Fully Connected!"}
 
 @app.post("/api/count-characters")
 def count_characters(selection: TextSelection):
@@ -149,8 +149,8 @@ def sample_graph(selection: TextSelection):
     nodes.append({
         "id": selected_node_id,
         "name": selection.text[:50] + ("..." if len(selection.text) > 50 else ""),
-        "val": 20,  # Size of the node
-        "color": "#888888",  # Gray color for the central node
+        "val": 30,  # Increased size for better visibility (was 20)
+        "color": "#4f2913",  # Dark brown from theme (was #888888)
         "group": "selected",
         "fullText": selection.text
     })

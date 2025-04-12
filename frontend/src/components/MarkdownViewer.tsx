@@ -7,6 +7,22 @@ import * as THREE from 'three';
 import Draggable from 'react-draggable';
 import '../styles/MarkdownViewer.css';
 
+// Icons for mode selectors
+const ModeIcons = {
+  'char-counter': '📊',
+  'sample-graph': '🔍',
+  'chat-rfq': '💬',
+  'nothing': '⚪'
+};
+
+// Theme colors for consistency
+const ThemeColors = {
+  primary: '#4f2913',    // Dark brown
+  secondary: '#7b8c43',  // Olive green
+  accent: '#c07140',     // Terracotta
+  light: '#f1e8d8',      // Beige/cream
+};
+
 // Define the available modes
 type ViewerMode = 'char-counter' | 'nothing' | 'sample-graph' | 'chat-rfq';
 
@@ -173,7 +189,7 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
       if (chatMessages.length === 0) {
         setChatMessages([{
           id: Date.now().toString(),
-          content: "Hello! I'm your RfQ assistant. How can I help you understand or analyze this document?",
+          content: "👋 Welcome to your RfQ assistant! I can help analyze this document, provide insights, or answer questions about its content. How can I assist you today?",
           sender: 'ai',
           timestamp: new Date()
         }]);
@@ -600,10 +616,6 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
     const isTabularData = contentPreview.includes('|') && 
                           (contentPreview.includes('\n|') || contentPreview.match(/\|\s*\d+\s*\|/g));
     
-    // Set up the canvas with appropriate dimensions - MUCH LARGER for tables
-    const maxWidth = isTabularData ? 3600 : 2800; // Doubled
-    const lineHeight = isTabularData ? 84 : 72; // Doubled
-    
     // For tabular data, use a specialized parser
     if (isTabularData) {
       return createTableNode(node, sourceName, contentPreview);
@@ -612,37 +624,65 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
     // Parse the markdown to get properly formatted text
     const parsedContent = parseSimpleMarkdown(contentPreview);
     
+    // Set up the canvas with appropriate dimensions - distinct from remark nodes
+    const maxWidth = 3200;
+    const lineHeight = 72;
+    
     // Measure and wrap text to fit within maxWidth
-    ctx.font = `18px Arial`; // Larger font
+    ctx.font = `18px Arial`;
     
     // Flatten and wrap paragraphs for rendering
     const allWrappedText: {text: string, style: string}[] = [];
     
+    // Add document title as first line
+    allWrappedText.push({
+      text: sourceName,
+      style: 'heading1'
+    });
+    
+    // Add a separator line
+    allWrappedText.push({text: '', style: 'normal'});
+    
+    // Get first few paragraphs for preview
+    let paragraphCount = 0;
+    const maxParagraphs = 5;
+    
     parsedContent.forEach(item => {
-      const font = getMarkdownFont(item.style);
-      ctx.font = font;
+      // Limit the number of paragraphs for preview
+      if (item.style === 'normal' && item.text.trim().length > 0) {
+        paragraphCount++;
+      }
       
-      const wrappedLines = wrapText(ctx, item.text, maxWidth - 50);
-      wrappedLines.forEach(line => {
-        allWrappedText.push({
-          text: line,
-          style: item.style
+      if (paragraphCount <= maxParagraphs) {
+        const font = getMarkdownFont(item.style);
+        ctx.font = font;
+        
+        const wrappedLines = wrapText(ctx, item.text, maxWidth - 160); // Wider margin for cleaner look
+        wrappedLines.forEach(line => {
+          allWrappedText.push({
+            text: line,
+            style: item.style
+          });
         });
-      });
-      
-      // Add a blank line between paragraphs
-      if (item.style !== 'code') {
-        allWrappedText.push({text: '', style: 'normal'});
+        
+        // Add a blank line between paragraphs
+        if (item.style !== 'code') {
+          allWrappedText.push({text: '', style: 'normal'});
+        }
       }
     });
     
-    // Calculate canvas height based on content
-    const headerHeight = 60; // Taller header
-    const contentLines = allWrappedText.length;
-    const contentHeight = contentLines * lineHeight + 40;
-    const footerHeight = 30;
+    // Add "View more..." if content was truncated
+    if (paragraphCount > maxParagraphs) {
+      allWrappedText.push({text: 'View more...', style: 'italic'});
+    }
     
-    const totalHeight = headerHeight + contentHeight + footerHeight;
+    // Calculate canvas height based on content
+    const topMargin = 40;
+    const contentLines = allWrappedText.length;
+    const contentHeight = contentLines * lineHeight + 80; // Add extra space
+    
+    const totalHeight = topMargin + contentHeight;
     
     // Set canvas dimensions
     canvas.width = maxWidth * pixelRatio;
@@ -654,23 +694,55 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
     // Clear canvas
     ctx.clearRect(0, 0, maxWidth, totalHeight);
     
-    // Draw background - solid black
-    ctx.fillStyle = '#000000'; // Pure black, no opacity
-    roundRect(ctx, 0, 0, maxWidth, totalHeight, 16); // Same size
+    // Create gradient background for document-like appearance
+    const gradient = ctx.createLinearGradient(0, 0, maxWidth, 0);
+    gradient.addColorStop(0, '#4f2913'); // Dark brown from theme
+    gradient.addColorStop(0.4, '#7b5131'); // Lighter shade
+    gradient.addColorStop(1, '#4f2913'); // Back to dark brown
     
-    // Draw header
-    ctx.fillStyle = node.color || '#457b9d';
-    roundRect(ctx, 0, 0, maxWidth, headerHeight, { tl: 16, tr: 16, bl: 0, br: 0 });
+    // Draw background with document styling
+    ctx.fillStyle = gradient;
+    roundRect(ctx, 0, 0, maxWidth, totalHeight, 20);
     
-    // Draw header text
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 24px Arial'; // Larger header text
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`Source: ${sourceName}`, maxWidth / 2, headerHeight / 2);
+    // Add a "paper" inset for document appearance
+    ctx.fillStyle = '#f1e8d8'; // Light cream color
+    roundRect(ctx, 80, topMargin, maxWidth - 160, contentHeight - 40, 12);
     
-    // Draw content with proper markdown styling
-    let yPos = headerHeight + 25;
+    // Add thick border around the paper
+    ctx.strokeStyle = '#7b8c43'; // Olive green from theme (same as binding color)
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    roundRect(ctx, 80, topMargin, maxWidth - 160, contentHeight - 40, 12);
+    ctx.stroke();
+    
+    // Add subtle shadow to the paper
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 15;
+    ctx.shadowOffsetX = 5;
+    ctx.shadowOffsetY = 5;
+    
+    // Add decorative elements for document appearance
+    // Top document binding
+    ctx.fillStyle = '#7b8c43'; // Olive green from theme
+    ctx.fillRect(120, 8, maxWidth - 240, 24);
+    
+    // Document binding holes
+    const holePositions = [maxWidth * 0.2, maxWidth * 0.4, maxWidth * 0.6, maxWidth * 0.8];
+    holePositions.forEach(x => {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.beginPath();
+      ctx.arc(x, 20, 10, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    
+    // Reset shadow for text
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    
+    // Draw content with document styling
+    let yPos = topMargin + 40; // Start below top margin
     
     // Draw content with different styles for headings, lists, etc.
     allWrappedText.forEach((item, idx) => {
@@ -679,36 +751,54 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
       ctx.font = getMarkdownFont(style);
       
       if (style === 'heading1') {
-        ctx.fillStyle = '#FFFFFF';
-        yPos += 5; // Extra space before headings
+        ctx.fillStyle = '#4f2913'; // Dark brown
+        ctx.font = 'bold 32px "Arial Black", Arial, sans-serif';
+        // Center the title
+        ctx.textAlign = 'center';
+        ctx.fillText(text, maxWidth / 2, yPos);
+        ctx.textAlign = 'left'; // Reset for other text
+        yPos += 10; // Extra space after title
       } else if (style === 'heading2') {
-        ctx.fillStyle = '#FFFFFF';
+        ctx.fillStyle = '#7b5131'; // Medium brown
         yPos += 3; // Extra space before subheadings
       } else if (style === 'bold') {
-        ctx.fillStyle = '#FFFFFF';
+        ctx.fillStyle = '#4f2913'; // Dark brown
+      } else if (style === 'italic') {
+        ctx.fillStyle = '#7b5131'; // Medium brown
+        ctx.font = 'italic 18px Arial';
+        // Right-align "View more..."
+        ctx.textAlign = 'right';
+        ctx.fillText(text, maxWidth - 120, yPos);
+        ctx.textAlign = 'left'; // Reset alignment
       } else if (style === 'code') {
-        ctx.fillStyle = '#E0E0E0';
+        ctx.fillStyle = '#4f2913'; // Dark brown
         // Draw code background
-        ctx.fillStyle = 'rgba(70, 70, 70, 0.7)';
-        roundRect(ctx, 25, yPos - 5, maxWidth - 50, lineHeight + 10, 4);
-        ctx.fillStyle = '#FFFFFF';
+        ctx.fillStyle = 'rgba(211, 191, 169, 0.5)'; // Light beige for code blocks
+        roundRect(ctx, 100, yPos - 5, maxWidth - 200, lineHeight + 10, 4);
+        ctx.fillStyle = '#4f2913'; // Dark brown text
       } else if (style === 'list') {
-        ctx.fillStyle = '#FFFFFF';
+        ctx.fillStyle = '#4f2913'; // Dark brown
         // Draw bullet point
-        ctx.fillText('•', 25, yPos);
-        ctx.fillText(text, 45, yPos); // Indented text
+        ctx.fillText('•', 100, yPos);
+        ctx.fillText(text, 120, yPos); // Indented text
         yPos += lineHeight;
         return; // Skip normal rendering below
       } else {
-        ctx.fillStyle = '#EEEEEE';
+        ctx.fillStyle = '#333333'; // Dark gray for normal text
       }
       
-      if (text) {
-        ctx.fillText(text, 25, yPos);
+      if (text && style !== 'heading1' && style !== 'italic') {
+        ctx.fillText(text, 100, yPos);
       }
       
       yPos += lineHeight;
     });
+    
+    // Add a small document footer with page number styling
+    ctx.fillStyle = '#7b5131'; // Medium brown
+    ctx.font = 'italic 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Document: ${sourceName}`, maxWidth / 2, totalHeight - 20);
     
     // Create sprite with the canvas texture
     const texture = new THREE.CanvasTexture(canvas);
@@ -719,9 +809,9 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
     
     const sprite = new THREE.Sprite(material);
     
-    // Set scale - MUCH larger for better readability
+    // Set scale - different proportion than remark nodes
     const aspectRatio = totalHeight / maxWidth;
-    const scale = node.val * 1.44;  // Doubled
+    const scale = node.val * 1.25;
     sprite.scale.set(scale, scale * aspectRatio, 1);
     
     return sprite;
@@ -983,7 +1073,7 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
   
   // Create a standard text node for selected text
   const createStandardTextNode = (node: any, color: string) => {
-    const fontSize = 46; // Even larger text
+    const fontSize = 56; // Increased font size for better readability
     
     // Create a sprite with text texture
     const sprite = new THREE.Sprite(
@@ -993,9 +1083,9 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
       })
     );
     
-    // Scale sprite based on node size - increased scale for better readability
-    const scale = node.val / 1.0; // Larger scale
-    sprite.scale.set(scale * 5.6, scale / 0.5, 1); // Doubled scale
+    // Scale sprite based on node size - improved proportions for more professional look
+    const scale = node.val / 1.0;
+    sprite.scale.set(scale * 7.2, scale * 1.8, 1); // More balanced width-to-height ratio
     
     return sprite;
   };
@@ -1006,12 +1096,12 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
     const ctx = canvas.getContext('2d')!;
     const pixelRatio = window.devicePixelRatio || 1;
     
-    // Set canvas dimensions based on text length - wider canvas
+    // Set canvas dimensions based on text length - wider canvas with better proportions
     const textLength = text.length;
-    const width = Math.max(500, textLength * fontSize * 0.8);
+    const width = Math.max(600, textLength * fontSize * 0.8);
     
     canvas.width = width * pixelRatio;
-    canvas.height = 80 * pixelRatio; // Increased height significantly
+    canvas.height = 120 * pixelRatio; // Increased height for better vertical spacing
     
     ctx.scale(pixelRatio, pixelRatio);
     
@@ -1019,11 +1109,11 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     // Get the actual text width for sizing the background
-    ctx.font = `${fontSize}px Arial`;
+    ctx.font = `${fontSize}px "Arial Black", Arial, sans-serif`;
     
     // Try to render the full text first
     let displayText = text;
-    let actualTextWidth = ctx.measureText(text).width + 40; // Added more padding
+    let actualTextWidth = ctx.measureText(text).width + 80; // Added more horizontal padding
     
     // If text is very long, limit the width but keep as much text as possible
     if (actualTextWidth > width * 0.9) {
@@ -1042,13 +1132,25 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
       
       // Truncate and add ellipsis
       displayText = text.substring(0, fitChars) + '...';
-      actualTextWidth = ctx.measureText(displayText).width + 40;
+      actualTextWidth = ctx.measureText(displayText).width + 80;
     }
     
-    // Draw background with rounded corners - solid black
-    ctx.fillStyle = '#000000'; // Pure black, no opacity
-    const radius = 15; // Same size
+    // Draw background with rounded corners - better gradient background
+    const radius = 20; // Larger radius for more modern look
     
+    // Create gradient background
+    const gradient = ctx.createLinearGradient(0, 0, actualTextWidth, canvas.height / pixelRatio);
+    gradient.addColorStop(0, '#4f2913'); // Dark brown from theme
+    gradient.addColorStop(1, '#7b5131'); // Lighter shade for dimension
+    
+    ctx.fillStyle = gradient;
+    
+    // Draw rounded rectangle with better proportions
+    roundRect(ctx, 0, 0, actualTextWidth, canvas.height / pixelRatio, radius);
+    
+    // Add subtle border for depth
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(0 + radius, 0);
     ctx.lineTo(actualTextWidth - radius, 0);
@@ -1060,16 +1162,16 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
     ctx.lineTo(0, 0 + radius);
     ctx.quadraticCurveTo(0, 0, 0 + radius, 0);
     ctx.closePath();
-    ctx.fill();
+    ctx.stroke();
     
-    // Prepare text style - increased font size
-    ctx.font = `${fontSize}px Arial`;
+    // Prepare text style - using Arial Black for more professional appearance
+    ctx.font = `${fontSize}px "Arial Black", Arial, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
-    // Add stronger text shadow for better readability
-    ctx.shadowColor = 'rgba(0,0,0,0.8)';
-    ctx.shadowBlur = 5;
+    // Add subtle text shadow for better readability
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 4;
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
     
@@ -1423,7 +1525,9 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
   const handleChatKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage();
+      if (currentMessage.trim()) {
+        handleSendMessage();
+      }
     }
   };
   
@@ -1436,27 +1540,56 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
   
   // Render chat message
   const renderChatMessage = (message: ChatMessage) => {
+    // Format message timestamps
+    const formatTime = (date: Date) => {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+    
     return (
-      <div 
-        key={message.id} 
+      <motion.div 
+        key={message.id}
         className={`chat-message ${message.sender === 'user' ? 'user-message' : 'ai-message'}`}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
       >
         <div className="message-content">
-          <div className="message-text" dangerouslySetInnerHTML={{ __html: marked.parse(message.content) }}></div>
-          <div className="message-time">
-            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </div>
+          <div 
+            className="message-text"
+            dangerouslySetInnerHTML={{ 
+              __html: message.content
+                .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\n/g, '<br />')
+            }}
+          />
         </div>
-      </div>
+        <div className="message-time">{formatTime(message.timestamp)}</div>
+      </motion.div>
     );
   };
   
-  // Render chat interface
+  // Render the chat loading indicator with animation
+  const renderChatLoading = () => (
+    <motion.div 
+      className="chat-loading"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
+      <div className="chat-loading-dots">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </motion.div>
+  );
+
   const renderChatInterface = () => {
     return (
       <div className="chat-interface">
         <div className="chat-header">
-          <h3>Chat with your RfQ</h3>
+          <h3>Chat with RfQ</h3>
           {selectedModel && (
             <div className="chat-model-info">
               Using <span className="model-name">{selectedModel}</span>
@@ -1465,14 +1598,9 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
         </div>
         
         <div className="chat-messages">
-          {chatMessages.map(renderChatMessage)}
-          {isChatLoading && (
-            <div className="chat-loading">
-              <div className="chat-loading-dots">
-                <span></span><span></span><span></span>
-              </div>
-            </div>
-          )}
+          {chatMessages.map(message => renderChatMessage(message))}
+          
+          {isChatLoading && renderChatLoading()}
           <div ref={messagesEndRef} />
         </div>
         
@@ -1480,22 +1608,40 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
           <textarea
             ref={chatInputRef}
             className="chat-input"
-            placeholder="Type your question about the document..."
+            placeholder="Ask about this document..."
             value={currentMessage}
             onChange={(e) => setCurrentMessage(e.target.value)}
-            onKeyPress={handleChatKeyPress}
+            onKeyDown={handleChatKeyPress}
             disabled={isChatLoading}
-            rows={2}
+            rows={1}
+            style={{ height: Math.min(100, Math.max(50, currentMessage.split('\n').length * 24)) }}
           />
           <button 
             className="chat-send-button"
             onClick={handleSendMessage}
-            disabled={isChatLoading || !currentMessage.trim()}
+            disabled={!currentMessage.trim() || isChatLoading}
+            aria-label="Send message"
+            title="Send message"
           >
-            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-            </svg>
+            {!isChatLoading ? (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            ) : (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeDasharray="40" strokeDashoffset="0">
+                  <animateTransform
+                    attributeName="transform"
+                    type="rotate"
+                    from="0 12 12"
+                    to="360 12 12"
+                    dur="1s"
+                    repeatCount="indefinite"
+                  />
+                </circle>
+              </svg>
+            )}
           </button>
         </div>
       </div>
@@ -1513,10 +1659,10 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
             value={mode}
             onChange={handleModeChange}
           >
-            <option value="char-counter">Character Counter</option>
-            <option value="sample-graph">Source Analysis</option>
-            <option value="chat-rfq">Chat with your RfQ</option>
-            <option value="nothing">No Action</option>
+            <option value="char-counter">{ModeIcons['char-counter']} Character Counter</option>
+            <option value="sample-graph">{ModeIcons['sample-graph']} Source Analysis</option>
+            <option value="chat-rfq">{ModeIcons['chat-rfq']} Chat with your RfQ</option>
+            <option value="nothing">{ModeIcons['nothing']} No Action</option>
           </select>
         </div>
         
@@ -1532,13 +1678,13 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
                 disabled={isLoadingModels || isLoading || isChatLoading}
               >
                 {isLoadingModels && (
-                  <option value="">Loading models...</option>
+                  <option value="">⏳ Loading models...</option>
                 )}
                 
                 {aiModels.openai_models.length > 0 && (
                   <optgroup label="OpenAI Models">
                     {aiModels.openai_models.map(model => (
-                      <option key={model} value={model}>{model}</option>
+                      <option key={model} value={model}>🤖 {model}</option>
                     ))}
                   </optgroup>
                 )}
@@ -1546,12 +1692,12 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
                 {aiModels.ollama_models.length > 0 && (
                   <optgroup label="Ollama Models">
                     {aiModels.ollama_models.map(model => (
-                      <option key={model} value={model}>{model}</option>
+                      <option key={model} value={model}>🦙 {model}</option>
                     ))}
                   </optgroup>
                 )}
               </select>
-              {modelError && <div className="model-error">{modelError}</div>}
+              {modelError && <div className="model-error">⚠️ {modelError}</div>}
             </div>
             
             <div className="control-group">
