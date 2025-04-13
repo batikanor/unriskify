@@ -1234,6 +1234,9 @@ canvas {
   word-wrap: break-word;
 }
 
+.message-text a {
+  color: lightblue;
+}
 .message-text p {
   margin: 0 0 10px 0;
 }
