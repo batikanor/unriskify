@@ -976,7 +976,12 @@ def chat_rfq(text_selection: TextSelection):
                     for i, result in enumerate(web_search_results["results"], 1):
                         system_prompt += f"{i}. {result['title']}\nURL: {result['url']}\n{result['content']}\n\n"
                 
-                system_prompt += "When answering, use both the document content and the web search results when relevant."
+                system_prompt += """When answering, use both the document content and the web search results when relevant.
+                If you reference information from web search results, format links as proper markdown:
+                Example: [Title of Source](URL)
+                
+                Do NOT include generic phrases like "according to the web search results" without linking to the specific source.
+                """
             
             system_prompt += """
             When analyzing this document:
@@ -1023,7 +1028,12 @@ def chat_rfq(text_selection: TextSelection):
                     for i, result in enumerate(web_search_results["results"], 1):
                         context_prompt += f"{i}. {result['title']}\nURL: {result['url']}\n{result['content']}\n\n"
                 
-                context_prompt += "When answering, use both the document content and the web search results when relevant.\n\n"
+                context_prompt += """When answering, use both the document content and the web search results when relevant.
+                If you reference information from web search results, format links as proper markdown:
+                Example: [Title of Source](URL)
+                
+                Do NOT include generic phrases like "according to the web search results" without linking to the specific source.
+                """
             
             context_prompt += """
             When analyzing this document:
@@ -1062,7 +1072,8 @@ def chat_rfq(text_selection: TextSelection):
         return {
             "response": response_text,
             "model_used": model,
-            "web_search_used": need_web_search
+            "web_search_used": need_web_search,
+            "web_search_results": web_search_results if need_web_search else None
         }
         
     except Exception as e:

@@ -82,6 +82,16 @@ interface ChatMessage {
   sender: 'user' | 'ai';
   timestamp: Date;
   webSearchUsed?: boolean;
+  webSearchResults?: {
+    answer?: string;
+    results?: Array<{
+      title: string;
+      content: string;
+      url: string;
+      score: number;
+    }>;
+    provider?: string;
+  };
 }
 
 // Configure marked with GFM (GitHub Flavored Markdown) support
@@ -1507,7 +1517,8 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
         content: response.data.response,
         sender: 'ai',
         timestamp: new Date(),
-        webSearchUsed: response.data.web_search_used || false
+        webSearchUsed: response.data.web_search_used || false,
+        webSearchResults: response.data.web_search_results || undefined
       };
       
       setChatMessages(prev => [...prev, aiMessage]);
@@ -1552,6 +1563,57 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
     }
   }, [chatMessages]);
   
+  // Render web search results
+  const WebSearchResultsDisplay = ({ results }: { 
+    results: {
+      answer?: string;
+      results?: Array<{
+        title: string;
+        content: string;
+        url: string;
+        score: number;
+      }>;
+      provider?: string;
+    } 
+  }) => {
+    if (!results || (!results.results?.length && !results.answer)) {
+      return null;
+    }
+
+    return (
+      <div className="web-search-results">
+        <div className="web-search-header">
+          <span className="web-search-icon">🔎</span>
+          <span className="web-search-title">Web Search Results</span>
+          {results.provider && (
+            <span className="web-search-provider">via {results.provider}</span>
+          )}
+        </div>
+        
+        {results.answer && (
+          <div className="web-search-answer">
+            <p><strong>Summary:</strong> {results.answer}</p>
+          </div>
+        )}
+        
+        {results.results && results.results.length > 0 && (
+          <div className="web-search-sources">
+            <p><strong>Sources:</strong></p>
+            <ul>
+              {results.results.map((result, index) => (
+                <li key={index}>
+                  <a href={result.url} target="_blank" rel="noopener noreferrer">
+                    {result.title || 'Untitled Source'}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    );
+  };
+  
   // Render chat message
   const renderChatMessage = (message: ChatMessage) => {
     // Format message timestamps
@@ -1574,6 +1636,9 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
               __html: marked.parse(message.content)
             }}
           />
+          {message.webSearchUsed && message.webSearchResults && (
+            <WebSearchResultsDisplay results={message.webSearchResults} />
+          )}
         </div>
         <div className="message-time">
           {formatTime(message.timestamp)}
