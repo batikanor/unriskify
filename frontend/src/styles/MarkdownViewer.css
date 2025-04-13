@@ -1493,4 +1493,43 @@ canvas {
     background-color: #2a2a2a;
     border-color: rgba(255, 255, 255, 0.08);
   }
+}
+
+.web-search-indicator {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  font-size: 14px;
+  opacity: 0.9;
+  cursor: help;
+}
+
+.web-search-indicator:hover {
+  opacity: 1;
+}
+
+.chat-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.chat-feature-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(241, 232, 216, 0.8);
+  background-color: rgba(123, 140, 67, 0.4);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.feature-icon {
+  font-size: 14px;
+}
+
+.feature-text {
+  font-weight: 500;
 } 

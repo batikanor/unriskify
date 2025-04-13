@@ -81,6 +81,7 @@ interface ChatMessage {
   content: string;
   sender: 'user' | 'ai';
   timestamp: Date;
+  webSearchUsed?: boolean;
 }
 
 // Configure marked with GFM (GitHub Flavored Markdown) support
@@ -193,7 +194,7 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
       if (chatMessages.length === 0) {
         setChatMessages([{
           id: Date.now().toString(),
-          content: "👋 Welcome to your RfQ assistant! I can help analyze this document, provide insights, or answer questions about its content. How can I assist you today?",
+          content: "👋 Welcome to your RfQ assistant! I can help analyze this document, provide insights, or answer questions about its content. I can also search the web for relevant external information when needed. How can I assist you today?",
           sender: 'ai',
           timestamp: new Date()
         }]);
@@ -1495,12 +1496,18 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
       
       console.log('Chat response received:', response.data);
       
+      // Add special logging for web search 
+      if (response.data.web_search_used) {
+        console.log('%c🔎 WEB SEARCH WAS USED IN THIS RESPONSE 🔎', 'background: #4f2913; color: #f1e8d8; padding: 5px; font-size: 14px; font-weight: bold;');
+      }
+      
       // Add AI response to chat
       const aiMessage: ChatMessage = {
         id: Date.now().toString(),
         content: response.data.response,
         sender: 'ai',
-        timestamp: new Date()
+        timestamp: new Date(),
+        webSearchUsed: response.data.web_search_used || false
       };
       
       setChatMessages(prev => [...prev, aiMessage]);
@@ -1564,14 +1571,18 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
           <div 
             className="message-text"
             dangerouslySetInnerHTML={{ 
-              __html: message.content
-                .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-                .replace(/`([^`]+)`/g, '<code>$1</code>')
-                .replace(/\n/g, '<br />')
+              __html: marked.parse(message.content)
             }}
           />
         </div>
-        <div className="message-time">{formatTime(message.timestamp)}</div>
+        <div className="message-time">
+          {formatTime(message.timestamp)}
+          {message.webSearchUsed && (
+            <span className="web-search-indicator" title="Web search was used for this response">
+              {" "}🔎
+            </span>
+          )}
+        </div>
       </motion.div>
     );
   };
@@ -1597,11 +1608,17 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
       <div className="chat-interface">
         <div className="chat-header">
           <h3>Chat with RfQ</h3>
-          {selectedModel && (
-            <div className="chat-model-info">
-              Using <span className="model-name">{selectedModel}</span>
+          <div className="chat-features">
+            {selectedModel && (
+              <div className="chat-model-info">
+                Using <span className="model-name">{selectedModel}</span>
+              </div>
+            )}
+            <div className="chat-feature-info">
+              <span className="feature-icon" title="Web search capability enabled">🔎</span>
+              <span className="feature-text">Web Search</span>
             </div>
-          )}
+          </div>
         </div>
         
         <div className="chat-messages">
@@ -1615,7 +1632,7 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
           <textarea
             ref={chatInputRef}
             className="chat-input"
-            placeholder="Ask about this document..."
+            placeholder="Ask about this document or related external information..."
             value={currentMessage}
             onChange={(e) => setCurrentMessage(e.target.value)}
             onKeyDown={handleChatKeyPress}

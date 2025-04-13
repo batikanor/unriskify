@@ -15,10 +15,6 @@ import tiktoken
 from typing import Optional
 import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 # Load environment variables from .env file
 load_dotenv(dotenv_path="../.env")
 
@@ -27,9 +23,22 @@ LOGS_DIR = "logs"
 if not os.path.exists(LOGS_DIR):
     os.makedirs(LOGS_DIR)
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(os.path.join(LOGS_DIR, 'app.log'))
+    ]
+)
+logger = logging.getLogger(__name__)
+
 # API configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://host.docker.internal:11434")  # Default to Docker host for local Ollama
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 
 def count_tokens(text):
     """Count the number of tokens in a string."""
@@ -85,6 +94,7 @@ class TextSelection(BaseModel):
     chunk_size: int = 5  # Default chunk size for document processing
     line_constraint: Optional[int] = None  # Optional line constraint
     chat_history: Optional[list] = None  # Optional chat history
+    perform_web_search: Optional[bool] = None  # Whether to perform web search
 
 class GraphResponse(BaseModel):
     sources: list
@@ -699,10 +709,170 @@ def ollama_generate(messages, model, json_response=True):
     
     return formatted_response
 
+# Tavily search function
+def search_web(query, max_results=5):
+    """Search the web using Tavily API and return results, with Serper as fallback"""
+    try:
+        # First try Tavily API
+        if TAVILY_API_KEY:
+            logger.info("="*50)
+            logger.info(f"WEB SEARCH INITIATED (TAVILY): '{query}'")
+            logger.info(f"Using Tavily API key: {TAVILY_API_KEY[:4]}...{TAVILY_API_KEY[-4:]}")
+            logger.info("="*50)
+                
+            url = "https://api.tavily.com/search"
+            headers = {
+                "Content-Type": "application/json",
+                "X-Api-Key": TAVILY_API_KEY.strip()
+            }
+            
+            data = {
+                "query": query,
+                "search_depth": "basic",
+                "max_results": max_results,
+                "include_answer": True,
+                "include_images": False,
+                "include_raw_content": False
+            }
+            
+            logger.info(f"Tavily request headers: {headers}")
+            logger.info(f"Tavily request data: {data}")
+            
+            response = requests.post(url, json=data, headers=headers)
+            
+            logger.info(f"Tavily API response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                search_results = response.json()
+                logger.info(f"Tavily search successful for query: '{query}'")
+                
+                # Format results for easier consumption
+                formatted_results = []
+                if "results" in search_results:
+                    for result in search_results["results"]:
+                        formatted_results.append({
+                            "title": result.get("title", ""),
+                            "content": result.get("content", ""),
+                            "url": result.get("url", ""),
+                            "score": result.get("score", 0)
+                        })
+                        logger.info(f"Search result: {result.get('title', '')} | URL: {result.get('url', '')}")
+                
+                logger.info(f"Total results found: {len(formatted_results)}")
+                if "answer" in search_results:
+                    logger.info(f"Summary answer: {search_results.get('answer', '')[:100]}...")
+                    
+                logger.info("="*50)
+                
+                return {
+                    "answer": search_results.get("answer", ""),
+                    "results": formatted_results,
+                    "provider": "tavily"
+                }
+            else:
+                logger.error(f"Tavily search failed: {response.status_code} - {response.text}")
+                # Don't return here - fall through to Serper fallback
+        else:
+            logger.warning("Tavily API key not found. Trying Serper as fallback.")
+        
+        # Fall back to Serper API
+        if SERPER_API_KEY:
+            logger.info("="*50)
+            logger.info(f"WEB SEARCH INITIATED (SERPER FALLBACK): '{query}'")
+            logger.info(f"Using Serper API key: {SERPER_API_KEY[:4]}...{SERPER_API_KEY[-4:]}")
+            logger.info("="*50)
+            
+            url = "https://google.serper.dev/search"
+            headers = {
+                "X-API-KEY": SERPER_API_KEY.strip(),
+                "Content-Type": "application/json"
+            }
+            
+            data = {
+                "q": query,
+                "num": max_results
+            }
+            
+            logger.info(f"Serper request headers: {headers}")
+            logger.info(f"Serper request data: {data}")
+            
+            response = requests.post(url, json=data, headers=headers)
+            
+            logger.info(f"Serper API response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                serper_results = response.json()
+                logger.info(f"Serper search successful for query: '{query}'")
+                
+                # Format results from Serper (structure is different from Tavily)
+                formatted_results = []
+                
+                # Process organic results
+                if "organic" in serper_results:
+                    for result in serper_results["organic"]:
+                        formatted_results.append({
+                            "title": result.get("title", ""),
+                            "content": result.get("snippet", ""),
+                            "url": result.get("link", ""),
+                            "score": 0.8  # Default score since Serper doesn't provide relevance scores
+                        })
+                        logger.info(f"Serper result: {result.get('title', '')} | URL: {result.get('link', '')}")
+                
+                # Process knowledge graph if available
+                knowledge_graph_answer = ""
+                if "knowledgeGraph" in serper_results:
+                    kg = serper_results["knowledgeGraph"]
+                    knowledge_graph_answer = f"Knowledge Graph: {kg.get('title', '')}"
+                    if "description" in kg:
+                        knowledge_graph_answer += f" - {kg.get('description', '')}"
+                    
+                    # Add to formatted results if not empty
+                    if knowledge_graph_answer:
+                        formatted_results.append({
+                            "title": f"Knowledge Graph: {kg.get('title', '')}",
+                            "content": kg.get('description', ''),
+                            "url": kg.get('link', ''),
+                            "score": 0.9  # Knowledge graph is usually highly relevant
+                        })
+                
+                # Process answer box if available
+                answer_box_text = ""
+                if "answerBox" in serper_results:
+                    ab = serper_results["answerBox"]
+                    if "answer" in ab:
+                        answer_box_text = ab["answer"]
+                    elif "snippet" in ab:
+                        answer_box_text = ab["snippet"]
+                    elif "title" in ab:
+                        answer_box_text = ab["title"]
+                
+                logger.info(f"Total Serper results found: {len(formatted_results)}")
+                if answer_box_text:
+                    logger.info(f"Serper answer box: {answer_box_text[:100]}...")
+                
+                logger.info("="*50)
+                
+                return {
+                    "answer": answer_box_text or knowledge_graph_answer or "No direct answer available",
+                    "results": formatted_results,
+                    "provider": "serper"
+                }
+            else:
+                logger.error(f"Serper search failed: {response.status_code} - {response.text}")
+                return {"error": f"Both Tavily and Serper search failed", "results": [], "provider": "none"}
+        
+        # If neither API is available
+        logger.warning("No search API keys configured (neither Tavily nor Serper)")
+        return {"error": "Web search is not configured - missing API keys", "results": [], "provider": "none"}
+    
+    except Exception as e:
+        logger.error(f"Error in web search: {str(e)}")
+        return {"error": str(e), "results": [], "provider": "error"}
+
 @app.post("/api/chat-rfq")
 def chat_rfq(text_selection: TextSelection):
     """
-    Chat with the document content.
+    Chat with the document content and search the web when relevant.
     """
     try:
         # Get request parameters
@@ -718,11 +888,60 @@ def chat_rfq(text_selection: TextSelection):
         # Prepare document content: limit lines if specified
         if line_constraint:
             document_content = "\n".join(document_content.split("\n")[:line_constraint])
-            
+        
+        # First, determine if we need to search the web for the query
+        need_web_search = False
+        web_search_results = None
+        
         # Initialize LLM client based on model type
         client = None
         is_ollama = is_ollama_model(model)
         
+        # Check if we should search the web for this query
+        if not is_ollama:
+            # For OpenAI models, we can use a simple classification
+            if OPENAI_API_KEY:
+                # First check if "okay" is in the message (always do web search if it is)
+                if "okay" in message.lower():
+                    need_web_search = True
+                    logger.info(f"WEB SEARCH TRIGGERED BY KEYWORD 'okay' in message: '{message}'")
+                    web_search_results = search_web(message)
+                else:
+                    client = OpenAI(api_key=OPENAI_API_KEY)
+                    
+                    # Create a simple prompt to classify if web search is needed
+                    classify_messages = [
+                        {"role": "system", "content": "You are a classifier that determines if a user query about an RfQ document needs internet search. Respond with just 'yes' or 'no'."},
+                        {"role": "user", "content": f"Does this query need internet search to provide a complete answer? The query is about an RfQ document. Query: '{message}'"}
+                    ]
+                    
+                    classify_response = client.chat.completions.create(
+                        model="gpt-3.5-turbo",  # Use a simpler model for classification
+                        messages=classify_messages,
+                        temperature=0.1,
+                        max_tokens=5
+                    )
+                    
+                    classification = classify_response.choices[0].message.content.strip().lower()
+                    need_web_search = classification == "yes"
+                    
+                    if need_web_search:
+                        logger.info(f"Web search needed for query: {message}")
+                        web_search_results = search_web(message)
+            else:
+                need_web_search = False
+        else:
+            # For Ollama models, use a simple heuristic based on keywords
+            search_keywords = ["latest", "current", "recent", "update", "news", "trend", 
+                             "market", "competitor", "industry", "regulation", "standard",
+                             "best practice", "compare", "alternative", "option", "okay"]
+            need_web_search = any(keyword in message.lower() for keyword in search_keywords)
+            
+            if need_web_search:
+                logger.info(f"Web search needed for query (keyword match): {message}")
+                web_search_results = search_web(message)
+        
+        # Main chat processing
         if not is_ollama:
             # OpenAI models
             if not OPENAI_API_KEY:
@@ -730,9 +949,11 @@ def chat_rfq(text_selection: TextSelection):
                     "response": "Error: OpenAI API key not found. Please check your .env file.",
                     "model_used": model
                 }
-            client = OpenAI(api_key=OPENAI_API_KEY)
             
-            # Create system prompt
+            if client is None:
+                client = OpenAI(api_key=OPENAI_API_KEY)
+            
+            # Create system prompt, enhanced with web search results if available
             system_prompt = f"""You are an expert assistant helping to analyze a Request for Quotation (RfQ) document.
             You should review the document carefully and answer questions about its content, requirements, specifications, deadlines, and other relevant details.
             Provide clear, concise, and accurate responses. When information is not available in the document, be honest about it.
@@ -741,7 +962,23 @@ def chat_rfq(text_selection: TextSelection):
             ---
             {document_content}
             ---
+            """
             
+            # Add web search results if available
+            if need_web_search and web_search_results and not web_search_results.get("error"):
+                system_prompt += "\nI've also searched the web for relevant information and found:\n\n"
+                
+                if web_search_results.get("answer"):
+                    system_prompt += f"Search Summary: {web_search_results['answer']}\n\n"
+                
+                if web_search_results.get("results"):
+                    system_prompt += "Search Results:\n"
+                    for i, result in enumerate(web_search_results["results"], 1):
+                        system_prompt += f"{i}. {result['title']}\nURL: {result['url']}\n{result['content']}\n\n"
+                
+                system_prompt += "When answering, use both the document content and the web search results when relevant."
+            
+            system_prompt += """
             When analyzing this document:
             1. Identify key requirements, specifications, and constraints
             2. Consider important dates, deadlines, and milestones
@@ -772,6 +1009,29 @@ def chat_rfq(text_selection: TextSelection):
             ---
             {document_content}
             ---
+            """
+            
+            # Add web search results if available
+            if need_web_search and web_search_results and not web_search_results.get("error"):
+                context_prompt += "\nI've also searched the web for relevant information and found:\n\n"
+                
+                if web_search_results.get("answer"):
+                    context_prompt += f"Search Summary: {web_search_results['answer']}\n\n"
+                
+                if web_search_results.get("results"):
+                    context_prompt += "Search Results:\n"
+                    for i, result in enumerate(web_search_results["results"], 1):
+                        context_prompt += f"{i}. {result['title']}\nURL: {result['url']}\n{result['content']}\n\n"
+                
+                context_prompt += "When answering, use both the document content and the web search results when relevant.\n\n"
+            
+            context_prompt += """
+            When analyzing this document:
+            1. Identify key requirements, specifications, and constraints
+            2. Consider important dates, deadlines, and milestones
+            3. Look for technical specifications that need to be met
+            4. Note any compliance and regulatory requirements
+            5. Be attentive to evaluation criteria and selection processes
             
             Chat History:
             """
@@ -793,12 +1053,50 @@ def chat_rfq(text_selection: TextSelection):
             
             response_text = response["choices"][0]["message"]["content"]
         
-        # Return the response
-        return {"response": response_text, "model_used": model}
+        # Return the response with info about web search
+        if need_web_search:
+            logger.info("="*50)
+            logger.info(f"RESPONSE WITH WEB SEARCH DATA: '{message}' -> Used model: {model}")
+            logger.info("="*50)
+        
+        return {
+            "response": response_text,
+            "model_used": model,
+            "web_search_used": need_web_search
+        }
         
     except Exception as e:
         logger.error(f"Error in chat_rfq: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
+
+@app.get("/api/logs/web-search")
+def get_web_search_logs():
+    """
+    Retrieve logs of web search operations.
+    This is only for debugging purposes and should be disabled in production.
+    """
+    try:
+        log_file = os.path.join(LOGS_DIR, 'app.log')
+        if not os.path.exists(log_file):
+            return {"logs": [], "message": "No log file found"}
+            
+        # Read the log file and filter for web search entries
+        with open(log_file, 'r') as f:
+            logs = f.readlines()
+        
+        # Filter logs related to web search
+        web_search_logs = []
+        for log in logs:
+            if any(keyword in log for keyword in ["WEB SEARCH", "RESPONSE WITH WEB SEARCH"]):
+                web_search_logs.append(log.strip())
+        
+        return {
+            "logs": web_search_logs,
+            "count": len(web_search_logs)
+        }
+    except Exception as e:
+        logger.error(f"Error retrieving web search logs: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving logs: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
