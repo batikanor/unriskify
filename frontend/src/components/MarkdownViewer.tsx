@@ -108,14 +108,14 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
   const [characterCount, setCharacterCount] = useState<number | null>(null);
   const [popupPosition, setPopupPosition] = useState<{ x: number; y: number } | null>(null);
   const [isPopupVisible, setIsPopupVisible] = useState<boolean>(false);
-  const [mode, setMode] = useState<ViewerMode>('char-counter');
+  const [mode, setMode] = useState<ViewerMode>('chat-rfq');
   const [activeHighlight, setActiveHighlight] = useState<string | null>(null);
   const [graphData, setGraphData] = useState<SampleGraphData | null>(null);
   const [isGraphVisible, setIsGraphVisible] = useState<boolean>(false);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [isInteractingWithGraph, setIsInteractingWithGraph] = useState<boolean>(false);
   const [aiModels, setAiModels] = useState<ModelListData>({ openai_models: [], ollama_models: [] });
-  const [selectedModel, setSelectedModel] = useState<string>('gpt-4o');
+  const [selectedModel, setSelectedModel] = useState<string>('gpt-4o-mini');
   const [chunkSize, setChunkSize] = useState<number>(5);
   const [isLoadingModels, setIsLoadingModels] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -129,7 +129,7 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
   }>>([]);
   
   // New chat-related state
-  const [isChatVisible, setIsChatVisible] = useState<boolean>(false);
+  const [isChatVisible, setIsChatVisible] = useState<boolean>(true);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [currentMessage, setCurrentMessage] = useState<string>('');
   const [isChatLoading, setIsChatLoading] = useState<boolean>(false);
@@ -161,6 +161,19 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
     }
   }, [mode]);
 
+  // Initialize chat with welcome message when component mounts
+  useEffect(() => {
+    // Initialize chat if it's empty
+    if (chatMessages.length === 0) {
+      setChatMessages([{
+        id: Date.now().toString(),
+        content: "👋 Welcome to your RfQ assistant! I can help analyze this document, provide insights, or answer questions about its content. I can also search the web for relevant external information and reference structured data files when needed. How can I assist you today?",
+        sender: 'ai',
+        timestamp: new Date()
+      }]);
+    }
+  }, []);
+
   // Fetch available AI models
   const fetchModels = async () => {
     setIsLoadingModels(true);
@@ -183,7 +196,7 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
       
       // Set a fallback default model
       if (!selectedModel) {
-        setSelectedModel('gpt-4o');
+        setSelectedModel('gpt-4o-mini');
       }
     } finally {
       setIsLoadingModels(false);
