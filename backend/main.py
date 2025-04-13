@@ -13,6 +13,11 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import tiktoken
 from typing import Optional
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
 load_dotenv(dotenv_path="../.env")
@@ -79,6 +84,7 @@ class TextSelection(BaseModel):
     model: str = "gpt-4o"  # Default model
     chunk_size: int = 5  # Default chunk size for document processing
     line_constraint: Optional[int] = None  # Optional line constraint
+    chat_history: Optional[list] = None  # Optional chat history
 
 class GraphResponse(BaseModel):
     sources: list
@@ -692,6 +698,107 @@ def ollama_generate(messages, model, json_response=True):
     }
     
     return formatted_response
+
+@app.post("/api/chat-rfq")
+def chat_rfq(text_selection: TextSelection):
+    """
+    Chat with the document content.
+    """
+    try:
+        # Get request parameters
+        message = text_selection.text
+        chat_history = text_selection.chat_history if hasattr(text_selection, 'chat_history') else []
+        document_content = text_selection.document_content if hasattr(text_selection, 'document_content') else ""
+        model = text_selection.model
+        chunk_size = text_selection.chunk_size
+        line_constraint = text_selection.line_constraint
+        
+        logger.info(f"Chat RfQ request with model: {model}, chunk size: {chunk_size}, line_constraint: {line_constraint}")
+        
+        # Prepare document content: limit lines if specified
+        if line_constraint:
+            document_content = "\n".join(document_content.split("\n")[:line_constraint])
+            
+        # Initialize LLM client based on model type
+        client = None
+        is_ollama = is_ollama_model(model)
+        
+        if not is_ollama:
+            # OpenAI models
+            if not OPENAI_API_KEY:
+                return {
+                    "response": "Error: OpenAI API key not found. Please check your .env file.",
+                    "model_used": model
+                }
+            client = OpenAI(api_key=OPENAI_API_KEY)
+            
+            # Create system prompt
+            system_prompt = f"""You are an expert assistant helping to analyze a Request for Quotation (RfQ) document.
+            You should review the document carefully and answer questions about its content, requirements, specifications, deadlines, and other relevant details.
+            Provide clear, concise, and accurate responses. When information is not available in the document, be honest about it.
+            
+            Document Content:
+            ---
+            {document_content}
+            ---
+            
+            When analyzing this document:
+            1. Identify key requirements, specifications, and constraints
+            2. Consider important dates, deadlines, and milestones
+            3. Look for technical specifications that need to be met
+            4. Note any compliance and regulatory requirements
+            5. Be attentive to evaluation criteria and selection processes
+            """
+            
+            # Format chat history in OpenAI format
+            messages = [{"role": "system", "content": system_prompt}]
+            for msg in chat_history:
+                messages.append({"role": msg["role"], "content": msg["content"]})
+            messages.append({"role": "user", "content": message})
+            
+            # Call OpenAI API
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0.2
+            )
+            
+            response_text = response.choices[0].message.content
+            
+        else:  # Ollama model
+            # Create detailed prompt with document content
+            context_prompt = f"""You are an expert assistant helping to analyze a Request for Quotation (RfQ) document.
+            Document Content:
+            ---
+            {document_content}
+            ---
+            
+            Chat History:
+            """
+            
+            # Add chat history to the context
+            for msg in chat_history:
+                role = "User" if msg["role"] == "user" else "Assistant"
+                context_prompt += f"\n{role}: {msg['content']}"
+            
+            # Add the current message
+            context_prompt += f"\n\nUser: {message}\n\nAssistant: "
+            
+            # Call Ollama API
+            response = ollama_generate(
+                messages=[{"role": "user", "content": context_prompt}],
+                model=model,
+                json_response=False
+            )
+            
+            response_text = response["choices"][0]["message"]["content"]
+        
+        # Return the response
+        return {"response": response_text, "model_used": model}
+        
+    except Exception as e:
+        logger.error(f"Error in chat_rfq: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

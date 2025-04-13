@@ -116,12 +116,12 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
   }>>([]);
   
   // New chat-related state
-  const [chatVisible, setChatVisible] = useState<boolean>(false);
+  const [isChatVisible, setIsChatVisible] = useState<boolean>(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [currentMessage, setCurrentMessage] = useState<string>('');
   const [isChatLoading, setIsChatLoading] = useState<boolean>(false);
   
-  const markdownRef = useRef<HTMLDivElement>(null);
+  const markdownContentRef = useRef<HTMLDivElement>(null);
   const highlightLayerRef = useRef<HTMLDivElement>(null);
   const contentContainerRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<any>(null);
@@ -141,37 +141,41 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
       });
   }, [markdownPath]);
 
-  // Fetch available AI models
+  // Fetch AI models when component mounts or when mode changes to sample-graph or chat-rfq
   useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        setIsLoadingModels(true);
-        setModelError(null);
-        
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        const response = await axios.get(`${apiUrl}/api/models`);
-        
-        console.log("Available models:", response.data);
-        setAiModels(response.data);
-        
-        // Set default model (prefer OpenAI's gpt-4o if available)
-        if (response.data.openai_models.includes('gpt-4o')) {
-          setSelectedModel('gpt-4o');
-        } else if (response.data.openai_models.length > 0) {
-          setSelectedModel(response.data.openai_models[0]);
-        } else if (response.data.ollama_models.length > 0) {
-          setSelectedModel(response.data.ollama_models[0]);
-        }
-      } catch (error) {
-        console.error('Error fetching models:', error);
-        setModelError('Failed to load AI models. Using default model.');
-      } finally {
-        setIsLoadingModels(false);
-      }
-    };
+    if (mode === 'sample-graph' || mode === 'chat-rfq') {
+      fetchModels();
+    }
+  }, [mode]);
+
+  // Fetch available AI models
+  const fetchModels = async () => {
+    setIsLoadingModels(true);
+    setModelError(null);
     
-    fetchModels();
-  }, []);
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await axios.get(`${apiUrl}/api/models`);
+      console.log('AI models:', response.data);
+      
+      setAiModels(response.data);
+      
+      // Set default model if none selected
+      if (!selectedModel && response.data.openai_models.length > 0) {
+        setSelectedModel(response.data.openai_models[0]);
+      }
+    } catch (error) {
+      console.error('Error fetching AI models:', error);
+      setModelError('Failed to load AI models');
+      
+      // Set a fallback default model
+      if (!selectedModel) {
+        setSelectedModel('gpt-4o');
+      }
+    } finally {
+      setIsLoadingModels(false);
+    }
+  };
 
   // Handle mode change
   const handleModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -184,7 +188,7 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
     
     // Handle chat visibility
     if (newMode === 'chat-rfq') {
-      setChatVisible(true);
+      setIsChatVisible(true);
       // Add initial welcome message if no messages exist
       if (chatMessages.length === 0) {
         setChatMessages([{
@@ -195,7 +199,7 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
         }]);
       }
     } else {
-      setChatVisible(false);
+      setIsChatVisible(false);
     }
     
     // Clear any active highlights
@@ -435,7 +439,7 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
       }
       
       // Keep the selection alive unless we click outside the content
-      const markdownContent = markdownRef.current;
+      const markdownContent = markdownContentRef.current;
       const graphPopup = document.querySelector('.graph-popup');
       
       // Don't close if click is within markdown content or graph popup
@@ -1474,13 +1478,16 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
       console.log(`Sending chat message: "${currentMessage}" using model: ${selectedModel}, chunk size: ${chunkSize}, line constraint: ${lineConstraint}`);
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
       
+      // Format chat history for the API
+      const chatHistoryForAPI = chatMessages.map(msg => ({
+        role: msg.sender === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      }));
+      
       const response = await axios.post(`${apiUrl}/api/chat-rfq`, { 
-        message: currentMessage,
-        chat_history: chatMessages.map(msg => ({
-          role: msg.sender === 'user' ? 'user' : 'assistant',
-          content: msg.content
-        })),
+        text: currentMessage,
         document_content: documentContent,
+        chat_history: chatHistoryForAPI,
         model: selectedModel,
         chunk_size: chunkSize,
         line_constraint: lineConstraint
@@ -1616,32 +1623,16 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
             rows={1}
             style={{ height: Math.min(100, Math.max(50, currentMessage.split('\n').length * 24)) }}
           />
+          
           <button 
-            className="chat-send-button"
+            className="chat-send-button" 
             onClick={handleSendMessage}
-            disabled={!currentMessage.trim() || isChatLoading}
-            aria-label="Send message"
-            title="Send message"
+            disabled={isChatLoading || !currentMessage.trim()}
           >
-            {!isChatLoading ? (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            ) : (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeDasharray="40" strokeDashoffset="0">
-                  <animateTransform
-                    attributeName="transform"
-                    type="rotate"
-                    from="0 12 12"
-                    to="360 12 12"
-                    dur="1s"
-                    repeatCount="indefinite"
-                  />
-                </circle>
-              </svg>
-            )}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
           </button>
         </div>
       </div>
@@ -1690,28 +1681,26 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
                 )}
                 
                 {aiModels.ollama_models.length > 0 && (
-                  <optgroup label="Ollama Models">
+                  <optgroup label="Local Models">
                     {aiModels.ollama_models.map(model => (
-                      <option key={model} value={model}>🦙 {model}</option>
+                      <option key={model} value={model}>💻 {model}</option>
                     ))}
                   </optgroup>
                 )}
               </select>
-              {modelError && <div className="model-error">⚠️ {modelError}</div>}
             </div>
             
             <div className="control-group">
               <label htmlFor="chunk-size">Chunk Size:</label>
               <input 
-                id="chunk-size" 
-                className="chunk-size-input"
+                id="chunk-size"
                 type="number" 
+                className="chunk-size-input"
+                value={chunkSize}
+                onChange={handleChunkSizeChange}
                 min="1"
                 max="20"
-                value={chunkSize} 
-                onChange={handleChunkSizeChange}
                 disabled={isLoading || isChatLoading}
-                title="Number of documents to process at once (higher values use more resources)"
               />
             </div>
             
@@ -1723,14 +1712,12 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
                 value={lineConstraint === null ? "null" : lineConstraint.toString()}
                 onChange={handleLineConstraintChange}
                 disabled={isLoading || isChatLoading}
-                title="Limit the number of lines processed from each document"
               >
                 <option value="null">No limit</option>
-                <option value="10">10 lines</option>
                 <option value="100">100 lines</option>
-                <option value="200">200 lines</option>
                 <option value="500">500 lines</option>
                 <option value="1000">1000 lines</option>
+                <option value="5000">5000 lines</option>
               </select>
             </div>
           </>
@@ -1740,7 +1727,7 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
       <div className="viewer-layout">
         <div 
           ref={contentContainerRef}
-          className={`content-container ${chatVisible ? 'with-chat' : ''}`}
+          className={`content-container ${isChatVisible ? 'with-chat' : ''}`}
           onClick={() => {
             if (isPopupVisible || isGraphVisible) {
               // Close popup when clicking outside
@@ -1750,8 +1737,8 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
             }
           }}
         >
-          <div 
-            ref={markdownRef}
+          <div
+            ref={markdownContentRef}
             className="markdown-content"
             onMouseUp={handleMouseUp}
             onClick={handleClick}
@@ -1771,7 +1758,7 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
         </div>
         
         {/* Chat sidebar */}
-        {chatVisible && (
+        {isChatVisible && (
           <div className="chat-container">
             {renderChatInterface()}
           </div>
