@@ -1613,4 +1613,69 @@ canvas {
     color: #b3c470;
     border-bottom: 1px solid #b3c470;
   }
+}
+
+/* Structured Files Info */
+.structured-files-info {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 6px;
+  background-color: rgba(47, 92, 69, 0.1);
+  border-left: 3px solid rgba(47, 92, 69, 0.5);
+  font-size: 14px;
+}
+
+.structured-files-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 6px;
+}
+
+.structured-files-icon {
+  font-size: 16px;
+}
+
+.structured-files-title {
+  font-weight: 600;
+  color: rgba(47, 92, 69, 0.9);
+}
+
+.structured-files-list ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.structured-files-list li {
+  margin-bottom: 4px;
+  font-family: monospace;
+}
+
+.structured-files-indicator {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  font-size: 14px;
+  opacity: 0.9;
+  cursor: help;
+}
+
+.structured-files-indicator:hover {
+  opacity: 1;
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .structured-files-info {
+    background-color: rgba(241, 232, 216, 0.05);
+    border-left: 3px solid rgba(47, 92, 69, 0.4);
+  }
+  
+  .structured-files-title {
+    color: rgba(241, 232, 216, 0.9);
+  }
+  
+  .structured-files-list li {
+    color: rgba(241, 232, 216, 0.8);
+  }
 } 

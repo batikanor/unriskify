@@ -889,6 +889,58 @@ def chat_rfq(text_selection: TextSelection):
         if line_constraint:
             document_content = "\n".join(document_content.split("\n")[:line_constraint])
         
+        # Search for relevant structured input files based on the query
+        structured_files_content = []
+        try:
+            # Directory where structured input files are stored
+            structured_input_dir = "/app/structured_input"
+            
+            # Fallback to local development path if Docker path doesn't exist
+            if not os.path.exists(structured_input_dir):
+                structured_input_dir = "structured_input"
+                # Additional fallback in case we're running in a different working directory
+                if not os.path.exists(structured_input_dir):
+                    structured_input_dir = "../structured_input"
+            
+            if os.path.exists(structured_input_dir):
+                # Find all markdown files in the directory
+                md_files = glob.glob(f"{structured_input_dir}/**/*.md", recursive=True)
+                
+                # Extract keywords from message (simple approach)
+                keywords = message.lower().split()
+                keywords = [k for k in keywords if len(k) > 3]  # Filter out short words
+                
+                # Find most relevant files based on filename
+                relevant_files = []
+                for file in md_files:
+                    filename = os.path.basename(file).lower()
+                    relevance_score = sum(1 for k in keywords if k in filename)
+                    if relevance_score > 0:
+                        relevant_files.append((file, relevance_score))
+                
+                # Sort by relevance score and take top 3
+                relevant_files.sort(key=lambda x: x[1], reverse=True)
+                top_files = relevant_files[:3]
+                
+                # Read content from top relevant files
+                for file_path, score in top_files:
+                    try:
+                        with open(file_path, 'r') as f:
+                            content = f.read()
+                            # Limit content if needed
+                            if line_constraint:
+                                content = "\n".join(content.split("\n")[:min(100, line_constraint)])
+                            structured_files_content.append({
+                                "filename": os.path.basename(file_path),
+                                "content": content,
+                                "relevance": score
+                            })
+                            logger.info(f"Including structured input file: {os.path.basename(file_path)} with relevance {score}")
+                    except Exception as e:
+                        logger.error(f"Error reading structured input file {file_path}: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error searching structured input files: {str(e)}")
+        
         # First, determine if we need to search the web for the query
         need_web_search = False
         web_search_results = None
@@ -964,6 +1016,15 @@ def chat_rfq(text_selection: TextSelection):
             ---
             """
             
+            # Add structured input files if available
+            if structured_files_content:
+                system_prompt += "\nI've also found some relevant structured data files that might help answer the query:\n\n"
+                for idx, file_info in enumerate(structured_files_content, 1):
+                    system_prompt += f"STRUCTURED FILE {idx}: {file_info['filename']}\n"
+                    system_prompt += f"CONTENT:\n{file_info['content']}\n\n"
+                
+                system_prompt += "When answering, refer to these structured data files if they contain relevant information for the query.\n"
+            
             # Add web search results if available
             if need_web_search and web_search_results and not web_search_results.get("error"):
                 system_prompt += "\nI've also searched the web for relevant information and found:\n\n"
@@ -1016,6 +1077,15 @@ def chat_rfq(text_selection: TextSelection):
             ---
             """
             
+            # Add structured input files if available
+            if structured_files_content:
+                context_prompt += "\nI've also found some relevant structured data files that might help answer the query:\n\n"
+                for idx, file_info in enumerate(structured_files_content, 1):
+                    context_prompt += f"STRUCTURED FILE {idx}: {file_info['filename']}\n"
+                    context_prompt += f"CONTENT:\n{file_info['content']}\n\n"
+                
+                context_prompt += "When answering, refer to these structured data files if they contain relevant information for the query.\n"
+            
             # Add web search results if available
             if need_web_search and web_search_results and not web_search_results.get("error"):
                 context_prompt += "\nI've also searched the web for relevant information and found:\n\n"
@@ -1063,17 +1133,26 @@ def chat_rfq(text_selection: TextSelection):
             
             response_text = response["choices"][0]["message"]["content"]
         
-        # Return the response with info about web search
+        # Return the response with info about web search and structured files
         if need_web_search:
             logger.info("="*50)
             logger.info(f"RESPONSE WITH WEB SEARCH DATA: '{message}' -> Used model: {model}")
+            logger.info("="*50)
+        
+        used_structured_files = len(structured_files_content) > 0
+        if used_structured_files:
+            logger.info("="*50)
+            logger.info(f"RESPONSE WITH STRUCTURED FILES: '{message}' -> Used model: {model}")
+            logger.info(f"Used files: {[f['filename'] for f in structured_files_content]}")
             logger.info("="*50)
         
         return {
             "response": response_text,
             "model_used": model,
             "web_search_used": need_web_search,
-            "web_search_results": web_search_results if need_web_search else None
+            "web_search_results": web_search_results if need_web_search else None,
+            "structured_files_used": used_structured_files,
+            "structured_files": [f['filename'] for f in structured_files_content] if used_structured_files else []
         }
         
     except Exception as e:

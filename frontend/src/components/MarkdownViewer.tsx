@@ -92,6 +92,8 @@ interface ChatMessage {
     }>;
     provider?: string;
   };
+  structuredFilesUsed?: boolean;
+  structuredFiles?: string[];
 }
 
 // Configure marked with GFM (GitHub Flavored Markdown) support
@@ -204,7 +206,7 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
       if (chatMessages.length === 0) {
         setChatMessages([{
           id: Date.now().toString(),
-          content: "👋 Welcome to your RfQ assistant! I can help analyze this document, provide insights, or answer questions about its content. I can also search the web for relevant external information when needed. How can I assist you today?",
+          content: "👋 Welcome to your RfQ assistant! I can help analyze this document, provide insights, or answer questions about its content. I can also search the web for relevant external information and reference structured data files when needed. How can I assist you today?",
           sender: 'ai',
           timestamp: new Date()
         }]);
@@ -1511,6 +1513,12 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
         console.log('%c🔎 WEB SEARCH WAS USED IN THIS RESPONSE 🔎', 'background: #4f2913; color: #f1e8d8; padding: 5px; font-size: 14px; font-weight: bold;');
       }
       
+      // Add special logging for structured files
+      if (response.data.structured_files_used) {
+        console.log('%c📄 STRUCTURED FILES WERE USED IN THIS RESPONSE 📄', 'background: #2f5c45; color: #f1e8d8; padding: 5px; font-size: 14px; font-weight: bold;');
+        console.log('Files used:', response.data.structured_files);
+      }
+      
       // Add AI response to chat
       const aiMessage: ChatMessage = {
         id: Date.now().toString(),
@@ -1518,7 +1526,9 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
         sender: 'ai',
         timestamp: new Date(),
         webSearchUsed: response.data.web_search_used || false,
-        webSearchResults: response.data.web_search_results || undefined
+        webSearchResults: response.data.web_search_results || undefined,
+        structuredFilesUsed: response.data.structured_files_used || false,
+        structuredFiles: response.data.structured_files || []
       };
       
       setChatMessages(prev => [...prev, aiMessage]);
@@ -1614,6 +1624,29 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
     );
   };
   
+  // Render structured files display
+  const StructuredFilesDisplay = ({ files }: { files: string[] }) => {
+    if (!files || files.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="structured-files-info">
+        <div className="structured-files-header">
+          <span className="structured-files-icon">📄</span>
+          <span className="structured-files-title">Referenced Structured Files</span>
+        </div>
+        <div className="structured-files-list">
+          <ul>
+            {files.map((filename, index) => (
+              <li key={index}>{filename}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  };
+  
   // Render chat message
   const renderChatMessage = (message: ChatMessage) => {
     // Format message timestamps
@@ -1639,12 +1672,20 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
           {message.webSearchUsed && message.webSearchResults && (
             <WebSearchResultsDisplay results={message.webSearchResults} />
           )}
+          {message.structuredFilesUsed && message.structuredFiles && message.structuredFiles.length > 0 && (
+            <StructuredFilesDisplay files={message.structuredFiles} />
+          )}
         </div>
         <div className="message-time">
           {formatTime(message.timestamp)}
           {message.webSearchUsed && (
             <span className="web-search-indicator" title="Web search was used for this response">
               {" "}🔎
+            </span>
+          )}
+          {message.structuredFilesUsed && (
+            <span className="structured-files-indicator" title="Structured files were used for this response">
+              {" "}📄
             </span>
           )}
         </div>
@@ -1682,6 +1723,10 @@ const MarkdownViewer = ({ markdownPath }: MarkdownViewerProps) => {
             <div className="chat-feature-info">
               <span className="feature-icon" title="Web search capability enabled">🔎</span>
               <span className="feature-text">Web Search</span>
+            </div>
+            <div className="chat-feature-info">
+              <span className="feature-icon" title="Structured files capability enabled">📄</span>
+              <span className="feature-text">Structured Data</span>
             </div>
           </div>
         </div>
